@@ -20,6 +20,8 @@ object TcpConnection {
   case class CommandData(data: DataCommand) extends StateData
 
   case class ConnectionState(buffer: ByteString, stateData: StateData)
+
+  case object CheckBuffer
 }
 //https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, ConnectionState]  {
@@ -28,14 +30,13 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
   startWith(WaitingForCommand, ConnectionState(ByteString.empty, EmptyData))
 
   when(WaitingForCommand) {
-    case Event(Received(buffer), ConnectionState(stateBuffer, data)) =>
+    case Event(CheckBuffer, ConnectionState(buffer, data)) =>
       //TODO:: add check for buffer length
-      val newBuffer = stateBuffer ++ buffer
-      val rPosition = newBuffer.indexOf(rByte)
+      val rPosition = buffer.indexOf(rByte)
 
-      if(rPosition > 0 && newBuffer(rPosition + 1) == nByte){
-        val commandBytes = newBuffer.take(rPosition)
-        val newStateBytes = newBuffer.drop(rPosition + 2)
+      if(rPosition > 0 && buffer(rPosition + 1) == nByte){
+        val commandBytes = buffer.take(rPosition)
+        val newStateBytes = buffer.drop(rPosition + 2)
 
         val commandOpt = CommandParser.parse(commandBytes.utf8String)
 
@@ -53,20 +54,19 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         }
       }
       else
-        stay() using ConnectionState(newBuffer, data)
+        stay() using ConnectionState(buffer, data)
   }
 
 
   when(WaitingForData) {
-    case Event(Received(buffer), ConnectionState(stateBuffer, command: CommandData)) =>
-      val newBuffer = stateBuffer ++ buffer
+    case Event(CheckBuffer, ConnectionState(buffer, command: CommandData)) =>
       val commandBytesLength = command.data.bytes
 
       //Check if we have enought data to try parse bytes
-      if(newBuffer.length >= commandBytesLength + 2) {
-        if(newBuffer(commandBytesLength) == rByte && newBuffer(commandBytesLength + 1) == nByte) {
-          val commandData = newBuffer.take(commandBytesLength)
-          val connectionBuffer = newBuffer.drop(commandBytesLength + 2)
+      if(buffer.length >= commandBytesLength + 2) {
+        if(buffer(commandBytesLength) == rByte && buffer(commandBytesLength + 1) == nByte) {
+          val commandData = buffer.take(commandBytesLength)
+          val connectionBuffer = buffer.drop(commandBytesLength + 2)
           //TODO:: send message to router
           //router ! (command, commandData)
 
@@ -74,14 +74,14 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         }
         else {
           //TODO:: send error to cliend
-          val connectionBuffer = newBuffer.drop(commandBytesLength + 2)
+          val connectionBuffer = buffer.drop(commandBytesLength + 2)
 
           //TODO:: checn buffer for new command
           goto(WaitingForData) using ConnectionState(connectionBuffer, EmptyData)
         }
       }
       else
-        stay() using ConnectionState(newBuffer, command)
+        stay() using ConnectionState(buffer, command)
   }
 
   when(WaitingForResponse) {
@@ -93,9 +93,16 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
   whenUnhandled {
     case Event(Received(data), x: ConnectionState) =>
+      self ! CheckBuffer
       stay() using x.copy(buffer = x.buffer ++ data)
   }
 
-  initialize()
+  onTransition {
+    case _ -> WaitingForData =>
+      self ! CheckBuffer
+    case _ -> WaitingForCommand =>
+      self ! CheckBuffer
+  }
 
+  initialize()
 }
