@@ -1,7 +1,7 @@
 import java.net.InetSocketAddress
 
 import akka.actor.{ActorLogging, Props, Actor}
-import akka.io.Tcp.{Bound, Register, Connected}
+import akka.io.Tcp.{CommandFailed, Bound, Register, Connected}
 import akka.io.{Tcp, IO}
 
 object TcpServer {
@@ -19,6 +19,9 @@ class TcpServer(host: String, port: Int) extends Actor with ActorLogging {
     case Connected(remote, local) =>
       val connectionActor = context.actorOf(TcpConnection.props(sender()))
       sender() ! Register(connectionActor)
-  }
 
+    case CommandFailed(x: Tcp.Bind) =>
+      log.error(s"Cannot bind to iface: $host and port $port")
+      context.system.terminate()
+  }
 }
