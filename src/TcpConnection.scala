@@ -3,6 +3,7 @@ import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.ByteString
 import TcpConnection._
+import scala.concurrent.duration._
 
 object TcpConnection {
   def props(connection: ActorRef) = Props(new TcpConnection(connection))
@@ -17,7 +18,7 @@ object TcpConnection {
 
   sealed trait StateData
   case object EmptyData extends StateData
-  case class CommandData(data: DataCommand) extends StateData
+  case class CommandData(data: BytesCommand) extends StateData
 
   case class ConnectionState(buffer: ByteString, stateData: StateData)
 
@@ -26,6 +27,8 @@ object TcpConnection {
 //https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, ConnectionState]  {
   import TcpConnection._
+
+  val router = context.actorSelection("/user/keys")
 
   startWith(WaitingForCommand, ConnectionState(ByteString.empty, EmptyData))
 
@@ -41,11 +44,12 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         val commandOpt = CommandParser.parse(commandBytes.utf8String)
 
         commandOpt match {
-          case Some(x: DataCommand) =>
+          case Some(x: BytesCommand) =>
             //TODO:: send message to router
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
           case Some(x: Command) =>
             //TODO:: send message to router
+            router ! x
             goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
           case None =>
             connection ! Tcp.Write(ByteString("ERROR\r\n"))
@@ -73,10 +77,9 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
           goto(WaitingForResponse) using ConnectionState(connectionBuffer, EmptyData)
         }
         else {
-          //TODO:: send error to cliend
-          val connectionBuffer = buffer.drop(commandBytesLength + 2)
+          sender() ! Error.toByteString
 
-          //TODO:: checn buffer for new command
+          val connectionBuffer = buffer.drop(commandBytesLength + 2)
           goto(WaitingForData) using ConnectionState(connectionBuffer, EmptyData)
         }
       }
@@ -84,10 +87,12 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         stay() using ConnectionState(buffer, command)
   }
 
-  when(WaitingForResponse) {
-    case Event(x: Response, stateData) =>
-      val response = x.toString + "\r\n"
-      connection ! Tcp.Write(ByteString(response))
+  when(WaitingForResponse, 1 second) {
+    case Event(response: Response, stateData) =>
+      connection ! Tcp.Write(response.toByteString)
+      goto(WaitingForCommand) using stateData
+    case Event(StateTimeout, stateData) =>
+      connection ! Tcp.Write(ByteString("END\r\n"))
       goto(WaitingForCommand) using stateData
   }
 
