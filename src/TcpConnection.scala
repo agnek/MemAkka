@@ -63,6 +63,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
 
   when(WaitingForData) {
+
     case Event(CheckBuffer, ConnectionState(buffer, command: CommandData)) =>
       val commandBytesLength = command.data.bytes
 
@@ -77,10 +78,10 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
           goto(WaitingForResponse) using ConnectionState(connectionBuffer, EmptyData)
         }
         else {
-          sender() ! Error.toByteString
+          connection ! Error.toByteString
 
           val connectionBuffer = buffer.drop(commandBytesLength + 2)
-          goto(WaitingForData) using ConnectionState(connectionBuffer, EmptyData)
+          goto(WaitingForCommand) using ConnectionState(connectionBuffer, EmptyData)
         }
       }
       else
@@ -100,6 +101,9 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
     case Event(Received(data), x: ConnectionState) =>
       self ! CheckBuffer
       stay() using x.copy(buffer = x.buffer ++ data)
+    case Event(PeerClosed, _) =>
+      context.stop(self)
+      stay()
   }
 
   onTransition {
