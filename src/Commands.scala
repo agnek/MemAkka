@@ -1,9 +1,11 @@
 import akka.util.ByteString
 
+
 sealed trait Command
 sealed trait BytesCommand {
   def bytes: Int
 }
+
 
 case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: String) extends Command
 case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
@@ -12,8 +14,13 @@ case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) ex
 case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 
+
+
 sealed trait RetrieveCommand extends Command
 case class GetCommand(key: String) extends RetrieveCommand
+case class GetsCommand(key: String) extends RetrieveCommand
+
+
 
 sealed trait Response {
   def toByteString: ByteString
@@ -36,7 +43,9 @@ case object NotFound extends Response {
 }
 
 case class Value(key: String, value: ByteString, flags: Int, cas: Option[Long]) extends Response {
-  val toByteString = ByteString(s"VALUE $key $flags ${value.length} ${cas.getOrElse("")}\r\n") ++ value
+  val toByteString =
+    ByteString(s"VALUE $key $flags ${value.length} ${cas.getOrElse("")}\r\n") ++ value  ++
+      ByteString("\r\nEND\r\n")
 }
 
 case object Deleted extends Response {

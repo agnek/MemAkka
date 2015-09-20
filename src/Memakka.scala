@@ -6,12 +6,18 @@ import scala.concurrent.duration.Duration
 object Memakka {
 
   def main (args: Array[String]) {
+    val system = createSystem()
+    Await.result(system.whenTerminated, Duration.Inf)
+  }
+
+  def createSystem(portToListen: Int = 11211): ActorSystem = {
+    println("Aaaaaaaaa")
     val system = ActorSystem.create("memakka")
-    val portToListen = 11211
 
     system.actorOf(TcpServer.props("localhost", portToListen), "tcp")
     system.actorOf(Router.props(), "keys")
 
-    Await.result(system.whenTerminated, Duration.Inf)
+    system
   }
+
 }

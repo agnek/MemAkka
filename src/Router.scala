@@ -1,4 +1,5 @@
 import akka.actor._
+import akka.util.ByteString
 
 import scala.collection.mutable
 
@@ -16,10 +17,15 @@ class Router extends Actor {
   override def supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   def receive = {
-    case x: SetCommand =>
-      val key = x.key
+    case (command: SetCommand, bytes) =>
+      val key = command.key
+      val entryRef = getActorForKey(key).getOrElse(createActorForKey(key))
+
+      entryRef forward (command: SetCommand, bytes)
+
     case x: GetCommand =>
-      keysMap.get(x.key) match {
+
+      getActorForKey(x.key) match {
         case None => sender() ! NotFound
         case Some(ref) => ref forward x
       }
@@ -29,10 +35,20 @@ class Router extends Actor {
         refsMap -= ref
         keysMap -= key
       }
+
+    case x => sender() ! ServerError(s"Cannot execute command: $x")
   }
 
-  def createActorForKey(key: String) = {
-
+  def getActorForKey(key: String): Option[ActorRef] = {
+    keysMap.get(key)
   }
 
+  def createActorForKey(key: String): ActorRef = {
+    val entryRef = context.actorOf(Entry.props(key))
+
+    keysMap += (key -> entryRef)
+    refsMap += (entryRef -> key)
+
+    entryRef
+  }
 }

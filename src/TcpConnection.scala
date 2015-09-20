@@ -45,10 +45,8 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
         commandOpt match {
           case Some(x: BytesCommand) =>
-            //TODO:: send message to router
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
           case Some(x: Command) =>
-            //TODO:: send message to router
             router ! x
             goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
           case None =>
@@ -72,8 +70,8 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         if(buffer(commandBytesLength) == rByte && buffer(commandBytesLength + 1) == nByte) {
           val commandData = buffer.take(commandBytesLength)
           val connectionBuffer = buffer.drop(commandBytesLength + 2)
-          //TODO:: send message to router
-          //router ! (command, commandData)
+
+          router ! (command.data, commandData)
 
           goto(WaitingForResponse) using ConnectionState(connectionBuffer, EmptyData)
         }
@@ -88,18 +86,20 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         stay() using ConnectionState(buffer, command)
   }
 
-  when(WaitingForResponse, 1 second) {
+  when(WaitingForResponse, 200 milliseconds) {
     case Event(response: Response, stateData) =>
       connection ! Tcp.Write(response.toByteString)
       goto(WaitingForCommand) using stateData
     case Event(StateTimeout, stateData) =>
-      connection ! Tcp.Write(ByteString("END\r\n"))
+      connection ! Tcp.Write(ServerError("Timeout").toByteString)
       goto(WaitingForCommand) using stateData
   }
 
   whenUnhandled {
     case Event(Received(data), x: ConnectionState) =>
-      self ! CheckBuffer
+      if(stateName != WaitingForResponse)
+        self ! CheckBuffer
+
       stay() using x.copy(buffer = x.buffer ++ data)
     case Event(PeerClosed, _) =>
       context.stop(self)
