@@ -46,12 +46,11 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         commandOpt match {
           case Some(x: BytesCommand) =>
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
-          case Some(x: Command) =>
-            router ! x
+          case Some(command: Command) =>
+            router ! command
             goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
           case None =>
             connection ! Tcp.Write(ByteString("ERROR\r\n"))
-
             goto(WaitingForCommand) using ConnectionState(newStateBytes, EmptyData)
         }
       }
@@ -65,7 +64,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
     case Event(CheckBuffer, ConnectionState(buffer, command: CommandData)) =>
       val commandBytesLength = command.data.bytes
 
-      //Check if we have enought data to try parse bytes
+      //Check if we have enough data to try parse bytes
       if(buffer.length >= commandBytesLength + 2) {
         if(buffer(commandBytesLength) == rByte && buffer(commandBytesLength + 1) == nByte) {
           val commandData = buffer.take(commandBytesLength)
@@ -86,14 +85,15 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         stay() using ConnectionState(buffer, command)
   }
 
-  when(WaitingForResponse, 200 milliseconds) {
+  when(WaitingForResponse, 100 milliseconds) {
     case Event(response: Response, stateData) =>
       connection ! Tcp.Write(response.toByteString)
       goto(WaitingForCommand) using stateData
     case Event(StateTimeout, stateData) =>
       connection ! Tcp.Write(ServerError("Timeout").toByteString)
       goto(WaitingForCommand) using stateData
-    case Event(CheckBuffer, _) => stay()
+
+    //case Event(CheckBuffer, _) => stay()
   }
 
   whenUnhandled {
