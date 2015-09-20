@@ -48,6 +48,10 @@ case class Value(key: String, value: ByteString, flags: Int, cas: Option[Long]) 
       ByteString("\r\nEND\r\n")
 }
 
+case object NoValue extends Response {
+  val toByteString = ByteString("END\r\n")
+}
+
 case object Deleted extends Response {
   val toByteString = ByteString("DELETED\r\n")
 }

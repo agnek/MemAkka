@@ -26,7 +26,7 @@ class Router extends Actor {
     case x: GetCommand =>
 
       getActorForKey(x.key) match {
-        case None => sender() ! NotFound
+        case None => sender() ! NoValue
         case Some(ref) => ref forward x
       }
 

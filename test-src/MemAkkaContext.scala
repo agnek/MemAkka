@@ -1,4 +1,5 @@
 import java.net.InetSocketAddress
+import java.util.Properties
 import java.util.logging.{Level, Logger}
 
 import net.spy.memcached.MemcachedClient
@@ -14,6 +15,10 @@ trait MemAkkaContext extends ForEach[MemcachedClient] {
     val (port, memAkka) = MemAkkaFactory.createSystem()
 
     Logger.getLogger("net.spy.memcached").setLevel(Level.WARNING)
+    val systemProperties = System.getProperties
+    systemProperties.put("net.spy.log.LoggerImpl", "net.spy.memcached.compat.log.SunLogger")
+    System.setProperties(systemProperties)
+
 
     val memcachedClient = new MemcachedClient(new InetSocketAddress("localhost", port))
 
