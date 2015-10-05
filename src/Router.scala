@@ -23,6 +23,12 @@ class Router extends Actor {
 
       entryRef forward (command: SetCommand, bytes)
 
+    case (command: AddCommand, bytes) =>
+      val key = command.key
+      val entryRef = getActorForKey(key).getOrElse(createActorForKey(key))
+
+      entryRef forward (command: AddCommand, bytes)
+
     case x: GetCommand =>
 
       getActorForKey(x.key) match {

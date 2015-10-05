@@ -19,8 +19,8 @@ trait MemAkkaContext extends ForEach[MemcachedClient] {
     systemProperties.put("net.spy.log.LoggerImpl", "net.spy.memcached.compat.log.SunLogger")
     System.setProperties(systemProperties)
 
-
-    val memcachedClient = new MemcachedClient(new InetSocketAddress("localhost", port))
+    Thread.sleep(1000)
+    val memcachedClient = new MemcachedClient(new InetSocketAddress("127.0.0.1", port))
 
     println(s"Started actor system on port $port")
 

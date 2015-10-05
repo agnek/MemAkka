@@ -49,6 +49,9 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
       sender() ! Stored
       stay using newState
 
+    case Event((x: AddCommand, _), _) =>
+      sender() ! NotStored
+      stay()
   }
 
   whenUnhandled {
