@@ -52,6 +52,21 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
     case Event((x: AddCommand, _), _) =>
       sender() ! NotStored
       stay()
+
+    case Event((x: ReplaceCommand, bytes: ByteString), state: InitializedData) =>
+      sender() ! Stored
+      //TODO:: add updating flags and timeout
+      stay() using state.copy(data = bytes)
+
+    case Event((x: AppendCommand, bytes: ByteString), state: InitializedData) =>
+      sender() ! Stored
+      //TODO:: add updating flags and timeout
+      stay() using state.copy(data = state.data ++ bytes)
+
+    case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
+      sender() ! Stored
+      //TODO:: add updating flags and timeout
+      stay() using state.copy(data = bytes ++ state.data)
   }
 
   whenUnhandled {

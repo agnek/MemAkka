@@ -17,20 +17,39 @@ class Router extends Actor {
   override def supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   def receive = {
-    case (command: SetCommand, bytes) =>
-      val key = command.key
-      val entryRef = getActorForKey(key).getOrElse(createActorForKey(key))
+    case command @ (x: SetCommand, bytes) =>
+      val entryRef = getActorForKey(x.key).getOrElse(createActorForKey(x.key))
+      entryRef forward command
 
-      entryRef forward (command: SetCommand, bytes)
+    case command @ (x: AddCommand, bytes) =>
+      val entryRef = getActorForKey(x.key).getOrElse(createActorForKey(x.key))
+      entryRef forward command
 
-    case (command: AddCommand, bytes) =>
-      val key = command.key
-      val entryRef = getActorForKey(key).getOrElse(createActorForKey(key))
+    case command @ (x: ReplaceCommand, bytes: ByteString) =>
+      val refOpt = getActorForKey(x.key)
 
-      entryRef forward (command: AddCommand, bytes)
+      refOpt match {
+        case None => sender() ! NotStored
+        case Some(ref) => ref forward command
+      }
+
+    case command @ (x: AppendCommand, bytes: ByteString) =>
+      val refOpt = getActorForKey(x.key)
+
+      refOpt match {
+        case None => sender() ! NotStored
+        case Some(ref) => ref forward command
+      }
+
+    case command @ (x: PrependCommand, bytes: ByteString) =>
+      val refOpt = getActorForKey(x.key)
+
+      refOpt match {
+        case None => sender() ! NotStored
+        case Some(ref) => ref forward command
+      }
 
     case x: GetCommand =>
-
       getActorForKey(x.key) match {
         case None => sender() ! NoValue
         case Some(ref) => ref forward x
