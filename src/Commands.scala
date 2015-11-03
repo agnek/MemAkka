@@ -13,8 +13,7 @@ case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extend
 case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
-
-
+case class DeleteCommand(key: String) extends Command
 
 sealed trait RetrieveCommand extends Command
 case class GetCommand(key: String) extends RetrieveCommand

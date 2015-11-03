@@ -9,7 +9,6 @@ get in case of more than one key
 gets in case of more than one key
 
 cas
-delete
 incr
 decr
 touch

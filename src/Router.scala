@@ -55,6 +55,19 @@ class Router extends Actor {
         case Some(ref) => ref forward x
       }
 
+    case DeleteCommand(key) =>
+      getActorForKey(key) match {
+        case None => sender() ! NotFound
+        case Some(actor) =>
+          context.unwatch(actor)
+          actor ! PoisonPill
+          removeActorForKey(key)
+
+          sender() ! Deleted
+      }
+
+
+
     case Terminated(ref) =>
       refsMap.get(ref).foreach { key =>
         refsMap -= ref
@@ -62,6 +75,13 @@ class Router extends Actor {
       }
 
     case x => sender() ! ServerError(s"Cannot execute command: $x")
+  }
+
+  def removeActorForKey(key: String) = {
+    keysMap.get(key).foreach { ref =>
+      keysMap -= key
+      refsMap -= ref
+    }
   }
 
   def getActorForKey(key: String): Option[ActorRef] = {
