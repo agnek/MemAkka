@@ -66,7 +66,17 @@ class Router extends Actor {
           sender() ! Deleted
       }
 
+    case x: IncrementCommand =>
+      getActorForKey(x.key) match {
+        case None => sender() ! NotFound
+        case Some(ref) => ref forward x
+      }
 
+    case x: DecrementCommand =>
+      getActorForKey(x.key) match {
+        case None => sender() ! NotFound
+        case Some(ref) => ref forward x
+      }
 
     case Terminated(ref) =>
       refsMap.get(ref).foreach { key =>

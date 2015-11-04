@@ -13,6 +13,8 @@ object CommandParser {
         case "prepend" => PrependCommand(tokens(1), tokens(2).toInt, tokens(3).toLong, tokens(4).toInt)
         case "get" => GetCommand(tokens(1))
         case "delete" => DeleteCommand(tokens(1))
+        case "incr" => IncrementCommand(tokens(1), tokens(2).toLong)
+        case "decr" => DecrementCommand(tokens(1), tokens(2).toLong)
       }
     }
 

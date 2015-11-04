@@ -15,6 +15,14 @@ case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) ext
 case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class DeleteCommand(key: String) extends Command
 
+case class IncrementCommand(key: String, value: Long) extends Command {
+  require(value > 0, "invalid numeric delta argument")
+}
+
+case class DecrementCommand(key: String, value: Long) extends Command {
+  require(value > 0, "invalid numeric delta argument")
+}
+
 sealed trait RetrieveCommand extends Command
 case class GetCommand(key: String) extends RetrieveCommand
 case class GetsCommand(key: String) extends RetrieveCommand
@@ -45,6 +53,10 @@ case class Value(key: String, value: ByteString, flags: Int, cas: Option[Long]) 
   val toByteString =
     ByteString(s"VALUE $key $flags ${value.length} ${cas.getOrElse("")}\r\n") ++ value  ++
       ByteString("\r\nEND\r\n")
+}
+
+case class OnlyValue(value: ByteString) extends Response {
+  val toByteString = value ++ ByteString("\r\n")
 }
 
 case object NoValue extends Response {

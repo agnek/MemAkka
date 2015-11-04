@@ -1,6 +1,9 @@
+import akka.actor.FSM.Failure
 import akka.actor._
 import akka.util.ByteString
 import Entry._
+
+import scala.util.{Success, Try}
 
 object Entry {
   def props(key: String) = Props(new Entry(key))
@@ -67,6 +70,35 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
       sender() ! Stored
       //TODO:: add updating flags and timeout
       stay() using state.copy(data = bytes ++ state.data)
+    case Event(x: IncrementCommand, state: InitializedData) =>
+      val valueTry = Try { state.data.utf8String.toLong }
+
+      valueTry match {
+        case Success(long) =>
+          val newValue = long + x.value
+          val newBufferValue = ByteString.fromString(newValue.toString)
+          sender() ! OnlyValue(newBufferValue)
+          stay() using state.copy(data = newBufferValue)
+
+        case util.Failure(_) =>
+          sender() ! ServerError("Cannot parse value as long")
+          stay()
+      }
+
+    case Event(x: DecrementCommand, state: InitializedData) =>
+      val valueTry = Try { state.data.utf8String.toLong }
+
+      valueTry match {
+        case Success(long) =>
+          val newValue = if(long > x.value) long - x.value else 0
+          val newBufferValue = ByteString.fromString(newValue.toString)
+          sender() ! OnlyValue(newBufferValue)
+          stay() using state.copy(data = newBufferValue)
+
+        case util.Failure(_) =>
+          sender() ! ServerError("Cannot parse value as long")
+          stay()
+      }
   }
 
   whenUnhandled {
