@@ -15,6 +15,7 @@ object CommandParser {
         case "delete" => DeleteCommand(tokens(1))
         case "incr" => IncrementCommand(tokens(1), tokens(2).toLong)
         case "decr" => DecrementCommand(tokens(1), tokens(2).toLong)
+        case "quit" => QuitCommand
       }
     }
 

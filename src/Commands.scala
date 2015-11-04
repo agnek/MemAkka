@@ -27,7 +27,7 @@ sealed trait RetrieveCommand extends Command
 case class GetCommand(key: String) extends RetrieveCommand
 case class GetsCommand(key: String) extends RetrieveCommand
 
-
+case object QuitCommand extends Command
 
 sealed trait Response {
   def toByteString: ByteString

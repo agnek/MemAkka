@@ -44,6 +44,9 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         val commandOpt = CommandParser.parse(commandBytes.utf8String)
 
         commandOpt match {
+          case Some(QuitCommand) =>
+            connection ! Tcp.Close
+            stop()
           case Some(x: BytesCommand) =>
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
           case Some(command: Command) =>
