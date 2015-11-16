@@ -1,4 +1,3 @@
-import akka.actor.FSM.Failure
 import akka.actor._
 import akka.util.ByteString
 import Entry._

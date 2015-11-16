@@ -49,16 +49,14 @@ class Router extends Actor {
       }
 
     case x: GetCommand =>
-      getActorForKey(x.key) match {
-        case None => sender() ! NoValue
-        case Some(ref) => ref forward x
-      }
+      val existingKeys = x.keys.filter(actorForKeyExists)
+      context.actorOf(GetRequestHolder.props(existingKeys, sender()))
 
     case DeleteCommand(key) =>
       getActorForKey(key) match {
         case None => sender() ! NotFound
         case Some(actor) =>
-          actor ! PoisonPill
+          context.stop(actor)
           sender() ! Deleted
       }
 

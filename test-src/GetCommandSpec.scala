@@ -13,5 +13,15 @@ class GetCommandSpec extends mutable.Specification with MemAkkaContext {
       client.get("bb") must beNull
     }
 
+    "return correct values is asking two keys" >> { client: MemcachedClient =>
+      client.set("a1", 100, "123").get() must beEqualTo(true)
+      client.set("a2", 100, "234").get() must beEqualTo(true)
+
+      val values = client.getBulk("a1", "a2")
+
+      values.get("a1") must beEqualTo("123")
+      values.get("a2") must beEqualTo("234")
+    }
+
   }
 }
