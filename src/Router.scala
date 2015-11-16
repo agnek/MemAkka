@@ -1,6 +1,5 @@
 import akka.actor._
 import akka.util.ByteString
-
 import scala.collection.mutable
 
 object Router {
@@ -59,10 +58,7 @@ class Router extends Actor {
       getActorForKey(key) match {
         case None => sender() ! NotFound
         case Some(actor) =>
-          context.unwatch(actor)
           actor ! PoisonPill
-          removeActorForKey(key)
-
           sender() ! Deleted
       }
 
@@ -78,31 +74,19 @@ class Router extends Actor {
         case Some(ref) => ref forward x
       }
 
-    case Terminated(ref) =>
-      refsMap.get(ref).foreach { key =>
-        refsMap -= ref
-        keysMap -= key
-      }
-
     case x => sender() ! ServerError(s"Cannot execute command: $x")
   }
 
-  def removeActorForKey(key: String) = {
-    keysMap.get(key).foreach { ref =>
-      keysMap -= key
-      refsMap -= ref
-    }
+  def getActorForKey(key: String): Option[ActorRef] = {
+    context.child(key)
   }
 
-  def getActorForKey(key: String): Option[ActorRef] = {
-    keysMap.get(key)
+  def actorForKeyExists(key: String): Boolean = {
+    context.child(key).isDefined
   }
 
   def createActorForKey(key: String): ActorRef = {
-    val entryRef = context.actorOf(Entry.props(key))
-
-    keysMap += (key -> entryRef)
-    refsMap += (entryRef -> key)
+    val entryRef = context.actorOf(Entry.props(key), key)
 
     entryRef
   }
