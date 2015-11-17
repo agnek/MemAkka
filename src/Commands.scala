@@ -24,6 +24,8 @@ case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) ext
 case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class DeleteCommand(key: String) extends Command
 case class TouchCommand(key: String, exptime: Long) extends Command with WithTimeout
+case object FlushAllCommand extends Command
+
 
 case class IncrementCommand(key: String, value: Long) extends Command {
   require(value > 0, "invalid numeric delta argument")
@@ -74,6 +76,10 @@ case class OnlyValue(value: ByteString) extends Response {
 
 case object End extends Response {
   val toByteString = ByteString("END\r\n")
+}
+
+case object Ok extends Response {
+  val toByteString = ByteString("OK\r\n")
 }
 
 case object Deleted extends Response {

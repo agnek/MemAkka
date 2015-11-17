@@ -41,6 +41,10 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
       sender() ! Value(state.key, state.data, state.flags, if(x.withCas) Some(state.cas) else None)
       stay()
 
+    case Event(x: TouchCommand, _) =>
+      sender() ! Touched
+      stay() forMax x.duration
+
     case Event((x: SetCommand, bytes: ByteString), oldState: InitializedData) =>
       val newState = InitializedData(x.key, x.flags, oldState.cas + 1, bytes)
       sender() ! Stored
@@ -61,6 +65,7 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
     case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
       stay() using state.copy(data = bytes ++ state.data, cas = state.cas + 1)
+
 
     case Event((x: CasCommand, bytes: ByteString), state: InitializedData) =>
       if(state.cas == x.cas) {

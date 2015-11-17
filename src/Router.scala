@@ -80,6 +80,19 @@ class Router extends Actor {
         case Some(ref) => ref forward x
       }
 
+    case x: TouchCommand =>
+      getActorForKey(x.key) match {
+        case None => sender() ! NotFound
+        case Some(ref) => ref forward x
+      }
+
+    case FlushAllCommand =>
+      context.children.foreach { ref =>
+        context.stop(ref)
+      }
+
+      sender() ! Ok
+
     case x => sender() ! ServerError(s"Cannot execute command: $x")
   }
 
