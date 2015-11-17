@@ -5,8 +5,6 @@ noreply flag
 timeout handling
 
 Commands to implement:
-gets
-
 cas
 touch
 flush_all

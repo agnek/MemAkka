@@ -46,8 +46,8 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
       sender() ! Value(state.key, state.data, state.flags, if(x.withCas) Some(state.cas) else None)
       stay()
 
-    case Event((x: SetCommand, bytes: ByteString), _) =>
-      val newState = InitializedData(x.key, x.flags, x.exptime, 1l, bytes, None)
+    case Event((x: SetCommand, bytes: ByteString), oldState: InitializedData) =>
+      val newState = InitializedData(x.key, x.flags, x.exptime, oldState.cas + 1, bytes, None)
       sender() ! Stored
       stay using newState
 
@@ -58,12 +58,12 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
     case Event((x: ReplaceCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
       //TODO:: add updating flags and timeout
-      stay() using state.copy(data = bytes)
+      stay() using state.copy(data = bytes, cas = state.cas + 1)
 
     case Event((x: AppendCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
       //TODO:: add updating flags and timeout
-      stay() using state.copy(data = state.data ++ bytes)
+      stay() using state.copy(data = state.data ++ bytes, cas = state.cas + 1)
 
     case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
@@ -77,7 +77,7 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
           val newValue = long + x.value
           val newBufferValue = ByteString.fromString(newValue.toString)
           sender() ! OnlyValue(newBufferValue)
-          stay() using state.copy(data = newBufferValue)
+          stay() using state.copy(data = newBufferValue, cas = state.cas + 1)
 
         case util.Failure(_) =>
           sender() ! ServerError("Cannot parse value as long")
@@ -92,7 +92,7 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
           val newValue = if(long > x.value) long - x.value else 0
           val newBufferValue = ByteString.fromString(newValue.toString)
           sender() ! OnlyValue(newBufferValue)
-          stay() using state.copy(data = newBufferValue)
+          stay() using state.copy(data = newBufferValue, cas = state.cas + 1)
 
         case util.Failure(_) =>
           sender() ! ServerError("Cannot parse value as long")
