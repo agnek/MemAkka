@@ -1,17 +1,29 @@
 import akka.util.ByteString
-
 sealed trait Command
+
 sealed trait BytesCommand {
   def bytes: Int
 }
 
-case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: Long) extends Command with BytesCommand
-case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
-case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
-case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
+sealed trait WithTimeout {
+  import scala.concurrent.duration._
+  def exptime: Long
+
+  def duration: Duration = {
+    if(exptime == 0) Duration.Inf
+    else if(exptime > System.currentTimeMillis() / 1000) (exptime - System.currentTimeMillis() / 1000) seconds
+    else exptime seconds
+  }
+}
+
+case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: Long) extends Command with BytesCommand with WithTimeout
+case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
+case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
+case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
 case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class DeleteCommand(key: String) extends Command
+case class TouchCommand(key: String, exptime: Long) extends Command with WithTimeout
 
 case class IncrementCommand(key: String, value: Long) extends Command {
   require(value > 0, "invalid numeric delta argument")

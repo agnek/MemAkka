@@ -1,40 +1,35 @@
 import akka.actor._
 import akka.util.ByteString
 import Entry._
-
+import scala.concurrent.duration._
 import scala.util.{Success, Try}
 
 object Entry {
   def props(key: String) = Props(new Entry(key))
 
   sealed trait EntryData
-  case class InitializedData(key: String, flags: Int, exptime: Long, cas: Long, data: ByteString, timeoutTask: Option[Cancellable]) extends EntryData
+  case class InitializedData(key: String, flags: Int, cas: Long, data: ByteString) extends EntryData
   case object UninitializedData extends EntryData
   
   sealed trait EntryState
   case object Uninitialized extends EntryState
   case object Initialized extends EntryState
-
-  case object TimeoutCommand
-
 }
 
 
 class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
-  println(s"Started actor for key: $key")
-
   startWith(Uninitialized, UninitializedData)
 
   when(Uninitialized) {
     case Event((x: SetCommand, bytes: ByteString), _) =>
-      val newState = InitializedData(x.key, x.flags, x.exptime, 1l, bytes, None)
+      val newState = InitializedData(x.key, x.flags, 1l, bytes)
       sender() ! Stored
-      goto(Initialized) using newState
+      goto(Initialized) forMax x.duration using newState
 
     case Event((x: AddCommand, bytes: ByteString), _) =>
-      val newState = InitializedData(x.key, x.flags, x.exptime, 1l, bytes, None)
+      val newState = InitializedData(x.key, x.flags, 1l, bytes)
       sender() ! Stored
-      goto(Initialized) using newState
+      goto(Initialized) forMax x.duration using newState
 
     case _ =>
       sender() ! Error
@@ -47,9 +42,9 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
       stay()
 
     case Event((x: SetCommand, bytes: ByteString), oldState: InitializedData) =>
-      val newState = InitializedData(x.key, x.flags, x.exptime, oldState.cas + 1, bytes, None)
+      val newState = InitializedData(x.key, x.flags, oldState.cas + 1, bytes)
       sender() ! Stored
-      stay using newState
+      stay forMax x.duration using newState
 
     case Event((x: AddCommand, _), _) =>
       sender() ! NotStored
@@ -57,23 +52,20 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
 
     case Event((x: ReplaceCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
-      //TODO:: add updating flags and timeout
-      stay() using state.copy(data = bytes, cas = state.cas + 1)
+      stay() forMax x.duration using state.copy(data = bytes, cas = state.cas + 1, flags = x.flags)
 
     case Event((x: AppendCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
-      //TODO:: add updating flags and timeout
       stay() using state.copy(data = state.data ++ bytes, cas = state.cas + 1)
 
     case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
-      //TODO:: add updating flags and timeout
       stay() using state.copy(data = bytes ++ state.data, cas = state.cas + 1)
 
     case Event((x: CasCommand, bytes: ByteString), state: InitializedData) =>
       if(state.cas == x.cas) {
         sender() ! Stored
-        stay() using state.copy(data = bytes, cas = state.cas + 1)
+        stay() forMax x.duration using state.copy(data = bytes, cas = state.cas + 1)
       }
       else {
         sender() ! Exists
@@ -112,9 +104,8 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
   }
 
   whenUnhandled {
-    case Event(TimeoutCommand, _) =>
-      self ! Kill
-      stay()
+    case Event(StateTimeout, _) =>
+      stop(FSM.Normal)
   }
 
   initialize()

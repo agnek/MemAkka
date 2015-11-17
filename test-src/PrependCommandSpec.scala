@@ -9,7 +9,7 @@ class PrependCommandSpec extends mutable.Specification with MemAkkaContext {
     }
 
     "correct update existing key data" >> { client: MemcachedClient =>
-      client.set("prep", 0, "data")
+      client.set("prep", 100, "data")
       client.prepend("prep", "test").get() must beEqualTo(true)
       client.get("prep") must beEqualTo("testdata")
     }

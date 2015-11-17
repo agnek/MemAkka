@@ -9,8 +9,8 @@ class ReplaceCommandSpec extends mutable.Specification with MemAkkaContext {
     }
 
     "correct update existing key data" >> { client: MemcachedClient =>
-      client.set("rep2", 0, "data")
-      client.replace("rep2", 0, "data2").get() must beEqualTo(true)
+      client.set("rep2", 100, "data")
+      client.replace("rep2", 100, "data2").get() must beEqualTo(true)
 
       client.get("rep2") must beEqualTo("data2")
     }
