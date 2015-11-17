@@ -5,7 +5,7 @@ sealed trait BytesCommand {
   def bytes: Int
 }
 
-case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: String) extends Command
+case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: Long) extends Command with BytesCommand
 case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
 case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand

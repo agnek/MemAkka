@@ -68,7 +68,18 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
     case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
       sender() ! Stored
       //TODO:: add updating flags and timeout
-      stay() using state.copy(data = bytes ++ state.data)
+      stay() using state.copy(data = bytes ++ state.data, cas = state.cas + 1)
+
+    case Event((x: CasCommand, bytes: ByteString), state: InitializedData) =>
+      if(state.cas == x.cas) {
+        sender() ! Stored
+        stay() using state.copy(data = bytes, cas = state.cas + 1)
+      }
+      else {
+        sender() ! Exists
+        stay()
+      }
+
     case Event(x: IncrementCommand, state: InitializedData) =>
       val valueTry = Try { state.data.utf8String.toLong }
 

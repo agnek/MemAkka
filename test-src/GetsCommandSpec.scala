@@ -6,7 +6,7 @@ class GetsCommandSpec extends mutable.Specification with MemAkkaContext {
     "return value with cas" >> { client: MemcachedClient =>
       client.set("castest", 100, "123").get()
 
-      client.gets("castest").getValue must beEqualTo("1233")
+      client.gets("castest").getValue must beEqualTo("123")
       client.gets("castest").getCas should beGreaterThan(0l)
     }
 

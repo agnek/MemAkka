@@ -5,7 +5,6 @@ noreply flag
 timeout handling
 
 Commands to implement:
-cas
 touch
 flush_all
 version

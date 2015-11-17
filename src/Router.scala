@@ -40,6 +40,14 @@ class Router extends Actor {
         case Some(ref) => ref forward command
       }
 
+    case command @ (x: CasCommand, bytes: ByteString) =>
+      val refOpt = getActorForKey(x.key)
+
+      refOpt match {
+        case None => sender() ! NotFound
+        case Some(ref) => ref forward command
+      }
+
     case command @ (x: PrependCommand, bytes: ByteString) =>
       val refOpt = getActorForKey(x.key)
 
