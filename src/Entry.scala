@@ -43,7 +43,7 @@ class Entry(key: String) extends Actor with FSM[EntryState, EntryData] {
 
   when(Initialized) {
     case Event(x: GetCommand, state: InitializedData) =>
-      sender() ! Value(state.key, state.data, state.flags, None)
+      sender() ! Value(state.key, state.data, state.flags, if(x.withCas) Some(state.cas) else None)
       stay()
 
     case Event((x: SetCommand, bytes: ByteString), _) =>

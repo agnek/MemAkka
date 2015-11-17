@@ -5,8 +5,7 @@ noreply flag
 timeout handling
 
 Commands to implement:
-get in case of more than one key
-gets in case of more than one key
+gets
 
 cas
 touch

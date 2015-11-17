@@ -11,7 +11,6 @@ object Memakka {
   }
 
   def createSystem(portToListen: Int = 11211): ActorSystem = {
-    println("Aaaaaaaaa")
     val system = ActorSystem.create("memakka")
 
     system.actorOf(TcpServer.props("localhost", portToListen), "tcp")

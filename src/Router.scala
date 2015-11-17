@@ -50,7 +50,7 @@ class Router extends Actor {
 
     case x: GetCommand =>
       val existingKeys = x.keys.filter(actorForKeyExists)
-      context.actorOf(GetRequestHolder.props(existingKeys, sender()))
+      context.actorOf(GetRequestHolder.props(existingKeys, sender(), x.withCas))
 
     case DeleteCommand(key) =>
       getActorForKey(key) match {

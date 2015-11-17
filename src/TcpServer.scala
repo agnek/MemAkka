@@ -9,7 +9,6 @@ object TcpServer {
 }
 
 class TcpServer(host: String, port: Int) extends Actor with ActorLogging {
-
   IO(Tcp)(context.system) ! Tcp.Bind(self, new InetSocketAddress(host, port))
   //TODO:: add check for already used port
   def receive = {

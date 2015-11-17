@@ -1,11 +1,9 @@
 import akka.util.ByteString
 
-
 sealed trait Command
 sealed trait BytesCommand {
   def bytes: Int
 }
-
 
 case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: String) extends Command
 case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
@@ -24,7 +22,7 @@ case class DecrementCommand(key: String, value: Long) extends Command {
 }
 
 sealed trait RetrieveCommand extends Command
-case class GetCommand(keys: Seq[String]) extends RetrieveCommand
+case class GetCommand(keys: Seq[String], withCas: Boolean = false) extends RetrieveCommand
 case class GetsCommand(keys: Seq[String]) extends RetrieveCommand
 
 case object QuitCommand extends Command
