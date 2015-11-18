@@ -88,7 +88,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
         stay() using ConnectionState(buffer, command)
   }
 
-  when(WaitingForResponse, 100 milliseconds) {
+  when(WaitingForResponse) {
     case Event(response: Response, stateData) =>
       connection ! Tcp.Write(response.toByteString)
       goto(WaitingForCommand) using stateData
@@ -96,7 +96,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
       connection ! Tcp.Write(ServerError("Timeout").toByteString)
       goto(WaitingForCommand) using stateData
 
-    //case Event(CheckBuffer, _) => stay()
+    case Event(CheckBuffer, _) => stay()
   }
 
   whenUnhandled {

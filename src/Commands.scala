@@ -74,10 +74,6 @@ case class OnlyValue(value: ByteString) extends Response {
   val toByteString = value ++ ByteString("\r\n")
 }
 
-case object End extends Response {
-  val toByteString = ByteString("END\r\n")
-}
-
 case object Ok extends Response {
   val toByteString = ByteString("OK\r\n")
 }

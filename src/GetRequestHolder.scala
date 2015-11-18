@@ -7,7 +7,7 @@ object GetRequestHolder {
 
 class GetRequestHolder(keys: Seq[String], connection: ActorRef, withCas: Boolean) extends Actor {
   if(keys.isEmpty) {
-    connection ! End
+    connection ! Values(Seq.empty)
     context.stop(self)
   }
 

@@ -7,7 +7,7 @@ class FlushAllCommandSpec extends mutable.Specification with MemAkkaContext {
       client.set("aa", 100, "bbbb").get()
 
       client.flush().get()
-      
+
       client.get("aa") must beNull
     }
   }

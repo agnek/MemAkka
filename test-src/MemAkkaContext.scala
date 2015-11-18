@@ -1,14 +1,10 @@
-import java.net.{SocketAddress, InetSocketAddress}
-import java.util.Properties
+import java.net.InetSocketAddress
 import java.util.logging.{Level, Logger}
-
-import net.spy.memcached.{AddrUtil, ConnectionFactoryBuilder, ConnectionObserver, MemcachedClient}
+import net.spy.memcached.MemcachedClient
 import org.specs2.execute.{Result, AsResult}
 import org.specs2.specification.ForEach
-
-import scala.concurrent.{Promise, Await}
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.util.{Failure, Try}
 
 trait MemAkkaContext extends ForEach[MemcachedClient] {
 
