@@ -1,4 +1,5 @@
 import akka.actor._
+import akka.cluster.sharding.{ClusterSharding, ShardRegion}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.ByteString
@@ -24,11 +25,13 @@ object TcpConnection {
 
   case object CheckBuffer
 }
+
 //https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, ConnectionState]  {
   import TcpConnection._
 
-  val router = context.actorSelection("/user/keys")
+
+  val keys = ClusterSharding(context.system).shardRegion("keys")
 
   startWith(WaitingForCommand, ConnectionState(ByteString.empty, EmptyData))
 
@@ -49,8 +52,11 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
             stop()
           case Some(x: BytesCommand) =>
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
+          case Some(command: GetCommand) =>
+            context.actorOf(GetRequestHolder.props(command.keys, self, command.withCas))
+            goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
           case Some(command: Command) =>
-            router ! command
+            keys ! command
             goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
           case None =>
             connection ! Tcp.Write(ByteString("ERROR\r\n"))
@@ -63,7 +69,6 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
 
   when(WaitingForData) {
-
     case Event(CheckBuffer, ConnectionState(buffer, command: CommandData)) =>
       val commandBytesLength = command.data.bytes
 
@@ -73,7 +78,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
           val commandData = buffer.take(commandBytesLength)
           val connectionBuffer = buffer.drop(commandBytesLength + 2)
 
-          router ! (command.data, commandData)
+          keys ! (command.data, commandData)
 
           goto(WaitingForResponse) using ConnectionState(connectionBuffer, EmptyData)
         }

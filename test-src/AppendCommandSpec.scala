@@ -8,10 +8,10 @@ class AppendCommandSpec extends mutable.Specification with MemAkkaContext {
     }
 
     "correct work when appending to existing key" >> { client: MemcachedClient =>
-      client.set("tappend", 100, "test").get()
+      client.set("tappend2", 100, "test").get()
 
-      client.append("tappend", "test").get() must beEqualTo(true)
-      client.get("tappend") must beEqualTo("testtest")
+      client.append("tappend2", "test").get() must beEqualTo(true)
+      client.get("tappend2") must beEqualTo("testtest")
     }
 
   }

@@ -16,75 +16,6 @@ class Router extends Actor {
   override def supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   def receive = {
-    case command @ (x: SetCommand, bytes) =>
-      val entryRef = getActorForKey(x.key).getOrElse(createActorForKey(x.key))
-      entryRef forward command
-
-    case command @ (x: AddCommand, bytes) =>
-      val entryRef = getActorForKey(x.key).getOrElse(createActorForKey(x.key))
-      entryRef forward command
-
-    case command @ (x: ReplaceCommand, bytes: ByteString) =>
-      val refOpt = getActorForKey(x.key)
-
-      refOpt match {
-        case None => sender() ! NotStored
-        case Some(ref) => ref forward command
-      }
-
-    case command @ (x: AppendCommand, bytes: ByteString) =>
-      val refOpt = getActorForKey(x.key)
-
-      refOpt match {
-        case None => sender() ! NotStored
-        case Some(ref) => ref forward command
-      }
-
-    case command @ (x: CasCommand, bytes: ByteString) =>
-      val refOpt = getActorForKey(x.key)
-
-      refOpt match {
-        case None => sender() ! NotFound
-        case Some(ref) => ref forward command
-      }
-
-    case command @ (x: PrependCommand, bytes: ByteString) =>
-      val refOpt = getActorForKey(x.key)
-
-      refOpt match {
-        case None => sender() ! NotStored
-        case Some(ref) => ref forward command
-      }
-
-    case x: GetCommand =>
-      val existingKeys = x.keys.filter(actorForKeyExists)
-      context.actorOf(GetRequestHolder.props(existingKeys, sender(), x.withCas))
-
-    case DeleteCommand(key) =>
-      getActorForKey(key) match {
-        case None => sender() ! NotFound
-        case Some(actor) =>
-          context.stop(actor)
-          sender() ! Deleted
-      }
-
-    case x: IncrementCommand =>
-      getActorForKey(x.key) match {
-        case None => sender() ! NotFound
-        case Some(ref) => ref forward x
-      }
-
-    case x: DecrementCommand =>
-      getActorForKey(x.key) match {
-        case None => sender() ! NotFound
-        case Some(ref) => ref forward x
-      }
-
-    case x: TouchCommand =>
-      getActorForKey(x.key) match {
-        case None => sender() ! NotFound
-        case Some(ref) => ref forward x
-      }
 
     case FlushAllCommand =>
       context.children.foreach { ref =>
@@ -94,19 +25,5 @@ class Router extends Actor {
       sender() ! Ok
 
     case x => sender() ! ServerError(s"Cannot execute command: $x")
-  }
-
-  def getActorForKey(key: String): Option[ActorRef] = {
-    context.child(key)
-  }
-
-  def actorForKeyExists(key: String): Boolean = {
-    context.child(key).isDefined
-  }
-
-  def createActorForKey(key: String): ActorRef = {
-    val entryRef = context.actorOf(Entry.props(key), key)
-
-    entryRef
   }
 }

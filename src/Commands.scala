@@ -16,28 +16,46 @@ sealed trait WithTimeout {
   }
 }
 
-case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: Long) extends Command with BytesCommand with WithTimeout
-case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
-case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
-case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand with WithTimeout
-case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
-case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command with BytesCommand
-case class DeleteCommand(key: String) extends Command
-case class TouchCommand(key: String, exptime: Long) extends Command with WithTimeout
+sealed trait KeyCommand {
+  def key: String
+}
+
+case class CasCommand(key: String, flags: Int, exptime: Long, bytes: Int, cas: Long) extends Command
+  with BytesCommand with WithTimeout with KeyCommand
+case class SetCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command
+  with BytesCommand with WithTimeout with KeyCommand
+case class AddCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command
+  with BytesCommand with WithTimeout with KeyCommand
+case class ReplaceCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command
+  with BytesCommand with WithTimeout with KeyCommand
+case class AppendCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command
+  with BytesCommand with KeyCommand
+case class PrependCommand(key: String, flags: Int, exptime: Long, bytes: Int) extends Command
+  with BytesCommand with KeyCommand
+
+case class DeleteCommand(key: String) extends Command with KeyCommand
+
+case class TouchCommand(key: String, exptime: Long) extends Command with WithTimeout with KeyCommand
+
 case object FlushAllCommand extends Command
 
 
-case class IncrementCommand(key: String, value: Long) extends Command {
+case class IncrementCommand(key: String, value: Long) extends Command with KeyCommand {
   require(value > 0, "invalid numeric delta argument")
 }
 
-case class DecrementCommand(key: String, value: Long) extends Command {
+case class DecrementCommand(key: String, value: Long) extends Command with KeyCommand {
   require(value > 0, "invalid numeric delta argument")
 }
 
 sealed trait RetrieveCommand extends Command
-case class GetCommand(keys: Seq[String], withCas: Boolean = false) extends RetrieveCommand
+case class GetCommand(keys: Seq[String], withCas: Boolean = false) extends RetrieveCommand with KeyCommand {
+  val key = keys.head
+}
+
 case class GetsCommand(keys: Seq[String]) extends RetrieveCommand
+
+case class GetInternalCommand(key: String, withCas: Boolean = false) extends RetrieveCommand with KeyCommand
 
 case object QuitCommand extends Command
 

@@ -4,14 +4,11 @@ object MemAkkaFactory {
 
   var startPort = 21211
 
-  def createSystem(): (Int, ActorSystem) = {
-    synchronized {
+  lazy val system: (Int, ActorSystem) = {
       val port = startPort
       val system = Memakka.createSystem(port)
-      startPort += 1
+      //startPort += 1
       (port, system)
-    }
-
   }
 
 }
