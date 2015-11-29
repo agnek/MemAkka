@@ -7,7 +7,7 @@ import org.specs2.specification.ForEach
 trait MemAkkaContext extends ForEach[MemcachedClient] {
 
   def foreach[R: AsResult](f: (MemcachedClient) => R): Result = {
-    val (port, memAkka) = MemAkkaFactory.system
+    val memAkka = MemAkkaFactory.system
 
     Logger.getLogger("net.spy.memcached").setLevel(Level.OFF)
 
@@ -15,7 +15,7 @@ trait MemAkkaContext extends ForEach[MemcachedClient] {
     systemProperties.put("net.spy.log.LoggerImpl", "net.spy.memcached.compat.log.SunLogger")
     System.setProperties(systemProperties)
 
-    val memcachedClient = new MemcachedClient(new InetSocketAddress("127.0.0.1", port))
+    val memcachedClient = new MemcachedClient(new InetSocketAddress("127.0.0.1", 11211))
 
     try
       AsResult(f(memcachedClient))

@@ -1,10 +1,9 @@
 import akka.actor._
-import akka.cluster.sharding.{ClusterSharding, ShardRegion}
+import akka.cluster.sharding.ClusterSharding
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.ByteString
 import TcpConnection._
-import scala.concurrent.duration._
 
 object TcpConnection {
   def props(connection: ActorRef) = Props(new TcpConnection(connection))
@@ -12,24 +11,26 @@ object TcpConnection {
   val rByte = '\r'.toByte
   val nByte = '\n'.toByte
 
+  case object CheckBuffer
+
   sealed trait State
   case object WaitingForCommand extends State
   case object WaitingForData extends State
   case object WaitingForResponse extends State
+  case object WaitingForGetResponse extends State
 
   sealed trait StateData
   case object EmptyData extends StateData
   case class CommandData(data: BytesCommand) extends StateData
+  case class WaitingForGetData(responsesToWait: Int) extends StateData
 
   case class ConnectionState(buffer: ByteString, stateData: StateData)
 
-  case object CheckBuffer
 }
 
 //https://github.com/memcached/memcached/blob/master/doc/protocol.txt
 class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, ConnectionState]  {
   import TcpConnection._
-
 
   val keys = ClusterSharding(context.system).shardRegion("keys")
 
@@ -37,30 +38,29 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
   when(WaitingForCommand) {
     case Event(CheckBuffer, ConnectionState(buffer, data)) =>
-      //TODO:: add check for buffer length
       val rPosition = buffer.indexOf(rByte)
 
       if(rPosition > 0 && buffer(rPosition + 1) == nByte){
         val commandBytes = buffer.take(rPosition)
         val newStateBytes = buffer.drop(rPosition + 2)
 
-        val commandOpt = CommandParser.parse(commandBytes.utf8String)
+        val commandOpt = CommandParser.parseUnsafe(commandBytes.utf8String)
 
         commandOpt match {
-          case Some(QuitCommand) =>
+          case QuitCommand =>
             connection ! Tcp.Close
             stop()
-          case Some(x: BytesCommand) =>
+          case x: BytesCommand =>
             goto(WaitingForData) using ConnectionState(newStateBytes, CommandData(x))
-          case Some(command: GetCommand) =>
-            context.actorOf(GetRequestHolder.props(command.keys, self, command.withCas))
-            goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
-          case Some(command: Command) =>
+          case command: GetCommand =>
+            command.keys.foreach { key =>
+              keys ! GetInternalCommand(key, command.withCas)
+            }
+
+            goto(WaitingForGetResponse) using ConnectionState(newStateBytes, WaitingForGetData(command.keys.length))
+          case command: Command =>
             keys ! command
             goto(WaitingForResponse) using ConnectionState(newStateBytes, EmptyData)
-          case None =>
-            connection ! Tcp.Write(ByteString("ERROR\r\n"))
-            goto(WaitingForCommand) using ConnectionState(newStateBytes, EmptyData)
         }
       }
       else
@@ -83,7 +83,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
           goto(WaitingForResponse) using ConnectionState(connectionBuffer, EmptyData)
         }
         else {
-          connection ! Error.toByteString
+          connection ! Error.asByteString
 
           val connectionBuffer = buffer.drop(commandBytesLength + 2)
           goto(WaitingForCommand) using ConnectionState(connectionBuffer, EmptyData)
@@ -95,21 +95,36 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
 
   when(WaitingForResponse) {
     case Event(response: Response, stateData) =>
-      connection ! Tcp.Write(response.toByteString)
-      goto(WaitingForCommand) using stateData
-    case Event(StateTimeout, stateData) =>
-      connection ! Tcp.Write(ServerError("Timeout").toByteString)
+      connection ! Tcp.Write(response.asByteString)
       goto(WaitingForCommand) using stateData
 
     case Event(CheckBuffer, _) => stay()
   }
 
+  when(WaitingForGetResponse) {
+    case Event(value: Response, ConnectionState(connectionBuffer, x: WaitingForGetData)) =>
+      if(value.isInstanceOf[Value]) connection ! Tcp.Write(value.asByteString)
+
+      if(x.responsesToWait == 1) {
+        connection ! Tcp.Write(End.asByteString)
+        goto(WaitingForCommand) using ConnectionState(connectionBuffer, EmptyData)
+      }
+      else
+        stay() using ConnectionState(connectionBuffer, x.copy(responsesToWait = x.responsesToWait - 1))
+  }
+
   whenUnhandled {
     case Event(Received(data), x: ConnectionState) =>
-      if(stateName != WaitingForResponse)
+      if(stateName != WaitingForResponse && stateName != WaitingForGetResponse) {
         self ! CheckBuffer
+      }
 
       stay() using x.copy(buffer = x.buffer ++ data)
+
+    //In some cases CheckBuffer can be already in mailbox and we should just ignore it
+    case Event(CheckBuffer, _) =>
+      stay()
+
     case Event(PeerClosed, _) =>
       context.stop(self)
       stay()
@@ -118,6 +133,7 @@ class TcpConnection(val connection: ActorRef) extends Actor with FSM[State, Conn
   onTransition {
     case _ -> WaitingForData =>
       self ! CheckBuffer
+
     case _ -> WaitingForCommand =>
       self ! CheckBuffer
   }

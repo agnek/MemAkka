@@ -12,15 +12,18 @@ object Memakka {
     Await.result(system.whenTerminated, Duration.Inf)
   }
 
-  def createSystem(portToListen: Int = 11211): ActorSystem = {
+  def createSystem(): ActorSystem = {
     val config = ConfigFactory.load("main.conf")
     val system = ActorSystem.create("memakka", config)
+
+    val host = config.getString("memakka.host")
+    val port = config.getInt("memakka.port")
 
     val promise = Promise[Unit]()
 
     Cluster(system).registerOnMemberUp  {
 
-      val keysRegion = ClusterSharding(system).start(
+      ClusterSharding(system).start(
         "keys",
         entityProps = Entry.props(),
         settings = ClusterShardingSettings(system),
@@ -28,7 +31,7 @@ object Memakka {
         extractShardId = Entry.shardResolver
       )
 
-      system.actorOf(TcpServer.props("127.0.0.1", portToListen, promise), "tcp")
+      system.actorOf(TcpServer.props(host, port, promise), "tcp")
     }
 
 

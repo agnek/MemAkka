@@ -22,110 +22,104 @@ object Entry {
   }
 
   val shardResolver: ShardRegion.ExtractShardId = {
-    case command: KeyCommand => (command.key.hashCode % 1024).toString
-    case (command: KeyCommand, data) => (command.key.hashCode % 1024).toString
+    case command: KeyCommand => (Math.abs(command.key.hashCode) % 1024).toString
+    case (command: KeyCommand, data) => (Math.abs(command.key.hashCode) % 1024).toString
   }
 }
 
 
 class Entry extends Actor with FSM[EntryState, EntryData] {
-  println("STARTED ENTRY ACTOR WITH PATH: " + self.path.toString)
-
   startWith(Uninitialized, UninitializedData)
 
-  when(Uninitialized, 60 seconds) {
+  when(Uninitialized, 5 seconds) {
     case Event((x: SetCommand, bytes: ByteString), _) =>
       val newState = InitializedData(x.key, x.flags, 1l, bytes)
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       goto(Initialized) forMax x.duration using newState
 
     case Event((x: AddCommand, bytes: ByteString), _) =>
       val newState = InitializedData(x.key, x.flags, 1l, bytes)
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       goto(Initialized) forMax x.duration using newState
 
-    case Event(x: GetCommand, _) =>
+    case Event(x: GetInternalCommand, _) =>
       sender() ! NotFound
       stay()
 
     case Event((x: ReplaceCommand, _), _) =>
-      sender() ! NotStored
+      if(!x.noreply) sender() ! NotStored
       stay()
 
     case Event((x: AppendCommand, _), _) =>
-      sender() ! NotStored
+      if(!x.noreply) sender() ! NotStored
       stay()
 
     case Event((x: CasCommand, _), _) =>
-      sender() ! NotFound
+      if(!x.noreply) sender() ! NotFound
       stay()
 
     case Event((x: PrependCommand, _), _) =>
-      sender() ! NotStored
+      if(!x.noreply) sender() ! NotStored
       stay()
 
     case Event(x: DeleteCommand, _) =>
-      sender() ! NotFound
+      if(!x.noreply) sender() ! NotFound
       stay()
 
     case Event(x: IncrementCommand, _) =>
-      sender() ! NotFound
+      if(!x.noreply) sender() ! NotFound
       stay()
 
     case Event(x: DecrementCommand, _) =>
-      sender() ! NotFound
+      if(!x.noreply) sender() ! NotFound
       stay()
 
     case Event(x: TouchCommand, _) =>
-      sender() ! NotFound
-      stay()
-
-    case _ =>
-      sender() ! Error
+      if(!x.noreply) sender() ! NotFound
       stay()
   }
 
   when(Initialized) {
-    case Event(x: GetCommand, state: InitializedData) =>
+    case Event(x: GetInternalCommand, state: InitializedData) =>
       sender() ! Value(state.key, state.data, state.flags, if(x.withCas) Some(state.cas) else None)
       stay()
 
     case Event(x: TouchCommand, _) =>
-      sender() ! Touched
+      if(!x.noreply) sender() ! Touched
       stay() forMax x.duration
 
     case Event((x: SetCommand, bytes: ByteString), oldState: InitializedData) =>
       val newState = InitializedData(x.key, x.flags, oldState.cas + 1, bytes)
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       stay forMax x.duration using newState
 
     case Event((x: AddCommand, _), _) =>
-      sender() ! NotStored
+      if(!x.noreply) sender() ! NotStored
       stay()
 
     case Event((x: ReplaceCommand, bytes: ByteString), state: InitializedData) =>
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       stay() forMax x.duration using state.copy(data = bytes, cas = state.cas + 1, flags = x.flags)
 
     case Event((x: AppendCommand, bytes: ByteString), state: InitializedData) =>
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       stay() using state.copy(data = state.data ++ bytes, cas = state.cas + 1)
 
     case Event((x: PrependCommand, bytes: ByteString), state: InitializedData) =>
-      sender() ! Stored
+      if(!x.noreply) sender() ! Stored
       stay() using state.copy(data = bytes ++ state.data, cas = state.cas + 1)
 
     case Event(x: DeleteCommand, _) =>
-      sender() ! Deleted
+      if(!x.noreply) sender() ! Deleted
       stop()
 
     case Event((x: CasCommand, bytes: ByteString), state: InitializedData) =>
       if(state.cas == x.cas) {
-        sender() ! Stored
+        if(!x.noreply) sender() ! Stored
         stay() forMax x.duration using state.copy(data = bytes, cas = state.cas + 1)
       }
       else {
-        sender() ! Exists
+        if(!x.noreply) sender() ! Exists
         stay()
       }
 
@@ -136,11 +130,11 @@ class Entry extends Actor with FSM[EntryState, EntryData] {
         case Success(long) =>
           val newValue = long + x.value
           val newBufferValue = ByteString.fromString(newValue.toString)
-          sender() ! OnlyValue(newBufferValue)
+          if(!x.noreply) sender() ! OnlyValue(newBufferValue)
           stay() using state.copy(data = newBufferValue, cas = state.cas + 1)
 
         case util.Failure(_) =>
-          sender() ! ServerError("Cannot parse value as long")
+          if(!x.noreply) sender() ! ServerError("Cannot parse value as long")
           stay()
       }
 
@@ -151,11 +145,11 @@ class Entry extends Actor with FSM[EntryState, EntryData] {
         case Success(long) =>
           val newValue = if(long > x.value) long - x.value else 0
           val newBufferValue = ByteString.fromString(newValue.toString)
-          sender() ! OnlyValue(newBufferValue)
+          if(!x.noreply) sender() ! OnlyValue(newBufferValue)
           stay() using state.copy(data = newBufferValue, cas = state.cas + 1)
 
         case util.Failure(_) =>
-          sender() ! ServerError("Cannot parse value as long")
+          if(!x.noreply) sender() ! ServerError("Cannot parse value as long")
           stay()
       }
   }
@@ -163,6 +157,10 @@ class Entry extends Actor with FSM[EntryState, EntryData] {
   whenUnhandled {
     case Event(StateTimeout, _) =>
       stop(FSM.Normal)
+
+    case _ =>
+      sender() ! Error
+      stay()
   }
 
   initialize()
