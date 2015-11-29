@@ -20,6 +20,7 @@ As in curiodb I hold each key entry as separate actor, that are sharded using ak
 ## Connection handling
 Due to memcached protocol doesn't support multiplexing all of command shoud be handled with same order as they have been sent.
 I had to use FSM extensions to hold connection state. There can be four states for connection:
+
 1. WaitingForCommand - initial state of connection. We are waiting for command to parse it.
 2. WaitingForData - some of commands such as set can be followed by data frame. So we should parse data before we start to handle this message.
 3. WaitingForResponse - we successfully parsed command and sent it to handling by keys actors and waiting for response.
@@ -27,6 +28,7 @@ I had to use FSM extensions to hold connection state. There can be four states f
 
 ## Keys hadling
 As I said before every key is holding by own actor. I also used FSM pattern to describe is logic. It can be only two states:
+
 1. Uninitialized - when actor was just created and handling first message.
 2. Initialized - actor was created and holds some data.
 
