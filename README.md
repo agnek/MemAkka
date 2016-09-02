@@ -26,7 +26,7 @@ I had to use FSM extensions to hold connection state. There can be four states f
 3. WaitingForResponse - we successfully parsed command and sent it to handling by keys actors and waiting for response.
 4. WaitingForGetResponse - I made special state for get commands because of in this state we can wait for reply from more than one actor if the were more than one key in get query.
 
-## Keys hadling
+## Keys handling
 As I said before every key is holding by own actor. I also used FSM pattern to describe is logic. It can be only two states:
 
 1. Uninitialized - when actor was just created and handling first message.
